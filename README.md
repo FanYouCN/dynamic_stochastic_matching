@@ -5,4 +5,4 @@ This respository includes python code for working paper: "An Approximate Dynamic
 The code contains implementation of main model of the paper, benchmark approaches for comparision, numerical instance generation and experimentation.
 
 ## Dependencies
-To replicate numerical experiments from the paper, or use the code to solve new dynamic stochastic matching instances, python packages `numpy`, `pandas`, `networkx`, as well as the `Gurobi` solver are required.
+To replicate numerical experiments from the paper, or use the code to solve new dynamic stochastic matching instances, python packages `numpy`, `networkx`, as well as the `Gurobi` solver are required.
