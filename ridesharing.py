@@ -4,73 +4,11 @@ import numpy as np
 import math
 from simulator import simulator
 import pandas as pd
+from ow_lp import ow_instance, ow_lp
 
 '''
     ridesharing instance generator
 '''
-
-
-class ow_instance:
-    def __init__(self, n):
-        '''
-        Ozkan and Ward (2020)
-        3 areas
-        3 Driver types, 3 Customer types
-        r(n,j) = 1, unweighted
-        f(n,j): failure probability of match (n,j)
-        arr_d(n): arrival rate of driver type n [Length N list]
-        arr_c(j): arrival rate of custoemr type j [Length J list]
-        '''
-        self.N = 3
-        self.J = 3
-        self.t = 10*n
-        self.arr_d = [0, 0.5, 0.5]
-        self.arr_c = [0.5, 0.5, 0]
-
-        self.n = n
-
-    def generate_instance(self):
-        N, J = self.N, self.J
-        self.G = nx.DiGraph()
-        for n in range(N):
-            self.G.add_node('D'+str(n+1))
-        for j in range(J):
-            self.G.add_node('C'+str(j+1))
-        for n in range(N):
-            for j in range(J):
-                self.G.add_edge('D'+str(n+1), 'C'+ str(j+1))
-                self.G.add_edge('C'+str(j+1), 'D'+ str(n+1))
-        self.alpha, self.beta = {}, {}
-
-        for n in range(N):
-            self.alpha['D'+str(n+1)] = 1 - math.exp(-10*self.n)
-        for j in range(J):
-            self.alpha['C'+str(j+1)] = 0
-
-        for n in range(N):
-            self.beta['D'+str(n+1)] = self.arr_d[n]
-        for j in range(J):
-            self.beta['C'+str(j+1)] = self.arr_c[j]
-        self.initState = {}
-        for v in self.G.nodes:
-            self.initState[v] = 0
-        self.r, self.f = {}, {}
-        for e in self.G.edges:
-            self.r[e] = 0.5
-            if e[0][1] == e[1][1]:
-                self.f[e] = 0
-            elif eval(e[0][1]) + eval(e[1][1]) == 3:
-                self.f[e] = 0.01
-            elif eval(e[0][1]) + eval(e[1][1]) == 4:
-                self.f[e] = 1
-            elif eval(e[0][1]) + eval(e[1][1]) == 5:
-                self.f[e] = 0.02
-        self.w = {}
-        for i in self.G.nodes:
-            self.w[i] = 0
-
-        a_dm = dm_instance(self.G, self.t, self.alpha, self.beta, self.initState, self.f, self.r, self.w)
-        return a_dm
 
 
 
@@ -180,80 +118,4 @@ class ridesharing_instance:
             self.initState[v] = np.random.randint(10)
         a_dm = dm_instance(self.G, self.t, self.alpha, self.beta, self.initState, self.f, self.r, w)
         return a_dm
-
-
-
-if __name__ == '__main__':
-    ride_pdf = pd.DataFrame()
-    ride_generator = ow_instance(1)
-    ride_dm = ride_generator.generate_instance()
-    sim = simulator(ride_dm, 2)
-    sim.run(100)
-    sim.results['description'] = ['ow_1']
-    sim.get_result_pdf()
-    print(sim.result_pdf)
-    ride_pdf = ride_pdf.append(sim.result_pdf, ignore_index=True)
-
-
-    ride_generator = ow_instance(10)
-    ride_dm = ride_generator.generate_instance()
-    sim = simulator(ride_dm, 2)
-    sim.run(10)
-    sim.results['description'] = ['ow_10']
-    sim.get_result_pdf()
-    print(sim.result_pdf)
-
-    ride_pdf = ride_pdf.append(sim.result_pdf, ignore_index=True)
-
-    ride_generator = ow_instance(100)
-    ride_dm = ride_generator.generate_instance()
-    sim = simulator(ride_dm, 2)
-    sim.run(10)
-    sim.results['description'] = ['ow_100']
-    sim.get_result_pdf()
-    print(sim.result_pdf)
-
-    ride_pdf = ride_pdf.append(sim.result_pdf, ignore_index=True)
-
-    for i in range(10):
-        ride_generator = ridesharing_instance(5, 20)
-        ride_dm = ride_generator.generate_instance(i)
-        sim = simulator(ride_dm, 2)
-        sim.run(10)
-        sim.results['description'] = ['ride_5_20_'+str(i+1)]
-        sim.get_result_pdf()
-        print(sim.result_pdf)
-
-        ride_pdf = ride_pdf.append(sim.result_pdf, ignore_index=True)
-
-
-    for i in range(10):
-        ride_generator = ridesharing_instance(10, 100)
-        ride_dm = ride_generator.generate_instance(i)
-        sim = simulator(ride_dm, 2)
-        sim.run(10)
-        sim.results['description'] = ['ride_10_100_'+str(i+1)]
-        sim.get_result_pdf()
-        print(sim.result_pdf)
-
-        ride_pdf = ride_pdf.append(sim.result_pdf, ignore_index=True)
-
-    for i in range(10):
-        ride_generator = ridesharing_instance(20, 100)
-        ride_dm = ride_generator.generate_instance(i)
-        sim = simulator(ride_dm, 2)
-        sim.run(10)
-        sim.results['description'] = ['ride_20_100_'+str(i+1)]
-        sim.get_result_pdf()
-        print(sim.result_pdf)
-
-        ride_pdf = ride_pdf.append(sim.result_pdf, ignore_index=True)
-
-    ride_pdf.to_csv('results/ride.csv')  
-
-
-
-
-
-
 

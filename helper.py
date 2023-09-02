@@ -1,11 +1,17 @@
 import itertools
 import networkx as nx
-from networkx import from_numpy_matrix, is_connected
+from networkx import from_numpy_array, is_connected
 from networkx.algorithms.bipartite.matching import maximum_matching
 from networkx.algorithms.flow import edmonds_karp
 from networkx.algorithms.flow import build_residual_network
 import numpy as np
+from math import floor
 import copy
+import gurobipy as grb
+import pickle
+from time import time
+TIME_LIMIT = 300
+
 
 '''
     helper functions for:
@@ -145,7 +151,7 @@ def birkhoff_von_neumann_decomposition(D):
         # is ``W``).
         X = to_bipartite_matrix(W)
         # Convert the matrix of a bipartite graph into a NetworkX graph object.
-        G = from_numpy_matrix(X)
+        G = from_numpy_array(X)
         # Compute a perfect matching for this graph. The dictionary `M` has one
         # entry for each matched vertex (in both the left and the right vertex
         # sets), and the corresponding value is its partner.
@@ -285,7 +291,7 @@ def blossom_separation(Graph, b, x):
 
     gh_tree = gomory_hu_tree(G, capacity='weight')
     moc, W = min_odd_cut(gh_tree, terminal_set)
-    if moc < 0.99:
+    if moc < 0.99:        
         return W
     else:
         return None
@@ -301,3 +307,119 @@ def are_blood_compatible(donor_blood, recipient_blood):
     if(recipient_blood == 'AB'):
         return True
     return False
+
+def audit_input(G, x, s):
+    for i in G.nodes:
+        cap = s[i]
+        consumption = 0
+        for e in G.edges:
+            _e = (e[1], e[0]) if e not in x else e
+            if i in _e:
+                if _e[0] == _e[1]:
+                    consumption += x[_e] * 2
+                else:
+                    consumption += x[_e]
+        if consumption > cap:
+            print(i, cap, consumption)
+
+def prob_alloc_cg(G, x0, s0):
+    integer_matchings = []
+    init_feasible_sol = {}
+    for e in G.edges:
+        _e = (e[1], e[0]) if e not in x0 else e
+        init_feasible_sol[e] = floor(x0[_e])
+    integer_matchings.append(init_feasible_sol)
+    stop = False
+    num_of_cg_cuts = 0
+    t0 = time()
+    while not stop:
+        if time() - t0 > TIME_LIMIT:
+            break
+
+        matching_indices = list(range(len(integer_matchings)))
+        rmp = grb.Model()
+        rmp.setParam('OutputFlag', 0)
+        _rho = rmp.addVars(matching_indices)
+        s_p = rmp.addVars(G.edges)
+        s_m = rmp.addVars(G.edges)
+        obj = 0
+        for e in G.edges:
+            obj += (s_p[e] + s_m[e])
+        rmp.setObjective(obj, grb.GRB.MINIMIZE)
+        left = 0
+        for matching in matching_indices:
+            left += _rho[matching]
+        rmp.addConstr(left == 1)
+
+        constraints = {}
+        for e in G.edges:
+            left = s_p[e] - s_m[e]
+            right = x0[e] if e in x0 else x0[(e[1], e[0])]
+            for matching in matching_indices:
+                left += _rho[matching] * integer_matchings[matching][e]
+            constraints[e] = rmp.addConstr(left == right)
+
+        rmp.optimize()
+
+        if rmp.objVal < 1e-4:
+            stop = True
+        else:
+            cg = grb.Model()
+            cg.setParam('OutputFlag', 0)
+            x = cg.addVars(G.edges, vtype=grb.GRB.INTEGER)
+            obj = 0
+            for e in G.edges:
+                obj += constraints[e].Pi * x[e] 
+            cg.setObjective(obj, grb.GRB.MAXIMIZE)
+            for i in G.nodes:
+                left = 0
+                for e in G.edges:
+                    if i in e:
+                        if e[0] != e[1]:
+                            left += x[e]
+                        else:
+                            left += 2*x[e]
+                cg.addConstr(left <= s0[i])
+            cg.optimize()
+            new_matching = {}
+            for e in G.edges:
+                new_matching[e] = int(x[e].X)
+            if new_matching not in integer_matchings:
+                num_of_cg_cuts += 1
+                integer_matchings.append(new_matching)
+            else:
+                stop = True
+
+    # print(rmp.objVal)
+
+    # if rmp.objVal > 1:
+    #     data = (G, x0, s0)
+    #     f = open('res/data.pkl', 'wb')
+    #     pickle.dump(data, f)
+    #     f.close()
+
+
+    matchings, prob = [], []
+    for matching in matching_indices:
+        p = _rho[matching].X
+        if p > 1e-6:
+            matchings.append(integer_matchings[matching])
+            prob.append(p)
+    for i in range(len(prob)):  
+        prob[i] = prob[i] / sum(prob)
+
+    m = np.random.choice(matchings, p=prob)
+    return m, num_of_cg_cuts
+
+if __name__ == '__main__':
+    f = open('res/data.pkl', 'rb')
+    data = pickle.load(f)
+    f.close()
+    G, x, s = data
+
+    print(x)
+    print('*'*100)
+    print(s)
+    
+    m, _ = prob_alloc_cg(G, x, s)
+    print(m)

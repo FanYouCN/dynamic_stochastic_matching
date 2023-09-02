@@ -2,6 +2,7 @@ import networkx as nx
 from dm_data import dm_instance
 import numpy as np
 from numpy.random import RandomState
+from simulator import simulator
 
 '''
     random dynamic matching instance generator
@@ -52,5 +53,12 @@ class instance_generator:
 
         this_dm = dm_instance(self.G, self.t, self.nu_bar, self.lam, self.initState, self.mu, self.r, self.w)
         return this_dm
+
+if __name__ == '__main__':
+    gen = instance_generator(graphSize=12, graphDensity=.8, arrival=5, sojourn=15, horizon=15, B=15)
+    dm = gen.generate_instance(1)
+    sim = simulator(dm, 2)
+    sim.run(10)
+
 
 

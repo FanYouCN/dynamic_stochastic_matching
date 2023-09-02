@@ -30,7 +30,7 @@ class myopic_model:
     def myopic_decision(self):
         lp = grb.Model()
         lp.setParam('OutputFlag', 0)
-        x = lp.addVars(self.Cycles)
+        x = lp.addVars(self.Cycles, vtype=grb.GRB.INTEGER)
         obj = 0
         for c in self.Cycles:
             obj += self.r[c] * x[c] * self.mu_bar[c]

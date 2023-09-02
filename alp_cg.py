@@ -4,6 +4,7 @@ import numpy as np
 from affine_model import affine_model
 import copy
 import math
+from time import time
 from numpy.random import RandomState
 INF = 1e6
 
@@ -100,7 +101,7 @@ class alp_cg:
         return 1
 
 
-    def solve_integer(self):
+    def solve_integer(self, verbose=0):
         self.build_cg()
         theta, V = {}, {}
         T_plus = len(self.DM.Horizon)+1
@@ -113,9 +114,14 @@ class alp_cg:
             V[T_plus, i] = 0
         cnt = 0
         status = 1
+        start_time = time()
         while status:
+            if time() - start_time > 3600:
+                break
             cnt += 1
             status = self.separation_integer(V, theta)
+            if verbose != 0:
+                print(self.rmp.objVal)
             if status == 0:
                 break
             else:
@@ -171,13 +177,33 @@ class alp_cg:
 if __name__ == '__main__':
     from instance_generator import instance_generator
     from simulator import simulator
+    import pandas as pd
+    import sys
+    params = sys.argv
+    size = eval(params[1])
+    results = {'alp_ub': [], 'cg_ub': [], 'alp_t': [], 'cg_t': [], 'ub_diff': []}
     for i in range(100):
-        gen = instance_generator(graphSize=10, graphDensity=.9, arrival=5, sojourn=15, horizon=5, B=5)
+        gen = instance_generator(graphSize=size, graphDensity=.9, arrival=5, sojourn=15, horizon=5, B=5)
         dm = gen.generate_instance(seed=i)
-        sim = simulator(dm, 3)
+        sim = simulator(dm, 4)
         sim.get_alp_ub()
         sim.get_cg_ub()
-        # sim.show_result()
         print(i, '*'*30)
-        if sim.ubs['alp_ub']-sim.ubs['cg_ub'] > 1e-4:
-            print(sim.ubs['alp_ub']-sim.ubs['cg_ub'])
+        aub, cub = sim.results['alp_ub'][0], sim.results['cg_ub'][0]
+        results['alp_ub'].append(aub)
+        results['cg_ub'].append(cub)
+        results['alp_t'].append(sim.results['alp_t'][0])
+        results['cg_t'].append(sim.results['cg_t'][0])
+        if abs(aub-cub)/aub*100 > 1e-4:
+            results['ub_diff'].append((aub-cub)/aub*100)
+            print((aub-cub)/aub*100)
+        else:
+            results['ub_diff'].append(0)
+    result_pdf = pd.DataFrame.from_dict(results)
+    print(result_pdf)
+    result_pdf.to_csv('results/L4cg'+str(size)+'.csv')
+
+
+
+
+

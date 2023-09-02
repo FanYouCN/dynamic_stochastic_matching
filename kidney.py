@@ -2,19 +2,21 @@ import networkx as nx
 from dm_data import dm_instance
 import numpy as np
 import math
-import random
+from numpy.random import RandomState
 from helper import are_blood_compatible
 from simulator import simulator
 import pandas as pd
+import argparse
 
 '''
     kidney exchange instance generator (Saidman generator)
 '''
 
 class kidney_instance:
-    def __init__(self, arrival, sojourn, horizon):
+    def __init__(self, arrival, sojourn, horizon, seed=42):
         G = nx.DiGraph()
         nodes, edges = set(), set()
+        self.rg = RandomState(seed)
         r, f = {}, {}
         for patient_gender in ['M', 'F']:
             for is_spouse in ['Y','N']:
@@ -30,7 +32,7 @@ class kidney_instance:
             if are_blood_compatible(patient_BT, donor_BT):
                 e = (i, i)
                 edges.add(e)
-                r[e] = random.gauss(37.1506024096, 22.2170610307)
+                r[e] = self.rg.normal(37.1506024096, 22.2170610307)*2
                 patientPRAtype = i[i.find('-')+1:]
                 patient_gender = i[0]
                 is_spouse = i[1]
@@ -56,7 +58,7 @@ class kidney_instance:
                 if are_blood_compatible(patient_BT, donor_BT):
                     e = (i, j)
                     edges.add(e)
-                    r[e] = random.gauss(37.1506024096, 22.2170610307)
+                    r[e] = self.rg.normal(37.1506024096, 22.2170610307)
                     patientPRA_type = i[i.find('-')+1:]
                     this_falure_rate = 0
                     if patientPRA_type == 'H':
@@ -69,7 +71,7 @@ class kidney_instance:
         initState = {}
         w = {}
         for i in G.nodes:
-            initState[i] = random.randint(0,6)
+            initState[i] = self.rg.randint(0,6)
             w[i] = 0
         alpha, beta = {}, {}
         for i in G.nodes:
@@ -107,26 +109,3 @@ class kidney_instance:
             beta[i] = prob * arrival
             self.dm = dm_instance(G, horizon, alpha, beta, initState, f, r, w)
 
-
-if __name__ == '__main__':
-    dm = kidney_instance(200,10,24).dm
-    sim = simulator(dm, L=2)
-    sim.run(10)
-    sim.results['description'] = ['kidney_2']
-    sim.get_result_pdf()
-    print(sim.result_pdf)
-
-    kidney_pdf = sim.result_pdf.copy()
-
-
-
-    dm = kidney_instance(200,10,24).dm
-    sim = simulator(dm, L=3)
-    sim.run(10)
-    sim.results['description'] = ['kidney_3']
-    sim.get_result_pdf()
-    print(sim.result_pdf)
-
-    kidney_pdf = kidney_pdf.append(sim.result_pdf)
-
-    kidney_pdf.to_csv('results/kidney.csv')  

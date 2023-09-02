@@ -4,6 +4,10 @@ import numpy as np
 import math
 from simulator import simulator
 import pandas as pd
+from affine_model import affine_model
+import argparse
+from temp import parse_df
+
 
 
 
@@ -11,7 +15,8 @@ import pandas as pd
     matchmaking instance generator
 '''
 
-def generate_mm(T, seed=42):
+def generate_mm(T, seed=42, wait_coef=0.5, arr_coef=1.0):
+    # base and first 3 extensions
     np.random.seed(seed)
     g = nx.Graph()
     for l in ['W','N','M','S']:
@@ -24,25 +29,26 @@ def generate_mm(T, seed=42):
                 if not (i[1] + j[1] ) in ["hl", "lh"] :
                     g.add_edge(i,j)   
     r = {}
+    reward_coef = 1
     for e in g.edges:
         diff = (e[0][0]==e[1][0]) + 2*(e[1][0]==e[1][1])
         if diff == 0:
-            r[e] = 10
+            r[e] = 10 * np.random.normal(loc=1.0, scale=0.1) * reward_coef  
         elif diff == 1:
-            r[e] = 8 * np.random.normal(loc=1.0, scale=0.1)
+            r[e] = 8 * np.random.normal(loc=1.0, scale=0.1) * reward_coef  
         elif diff == 2:
-            r[e] = 6 * np.random.normal(loc=1.0, scale=0.1)
+            r[e] = 6 * np.random.normal(loc=1.0, scale=0.1) * reward_coef  
         else:
-            r[e] = 5 * np.random.normal(loc=1.0, scale=0.1)
+            r[e] = 5 * np.random.normal(loc=1.0, scale=0.1) * reward_coef  
     w = {}
     for i in g.nodes:
         if i[1] == "h":
-            w[i] = 2 * np.random.normal(loc=1.0, scale=0.1)/2
+            w[i] = 2 * np.random.normal(loc=1.0, scale=0.1) * wait_coef
         elif i[1] == "m":
-            w[i] = 3 * np.random.normal(loc=1.0, scale=0.1)/2
+            w[i] = 3 * np.random.normal(loc=1.0, scale=0.1) * wait_coef
         else:
-            w[i] = 4 * np.random.normal(loc=1.0, scale=0.1)/2
-    s0 = {}
+            w[i] = 4 * np.random.normal(loc=1.0, scale=0.1) * wait_coef
+    s0 = {} 
     nu_bar = {}
     for i in g.nodes:
         s0[i] = np.random.randint(2)
@@ -50,20 +56,20 @@ def generate_mm(T, seed=42):
     arr = {}
     for i in g.nodes:
         if i[1] == 'h':
-            arr[i] = 0.2 * np.random.normal(loc=1.0, scale=0.2)
+            arr[i] = 0.2 * np.random.normal(loc=1.0, scale=0.2) * arr_coef
         elif i[1] == 'm':
-            arr[i] = 0.5 * np.random.normal(loc=1.0, scale=0.2)
+            arr[i] = 0.5 * np.random.normal(loc=1.0, scale=0.2) * arr_coef
         else:
-            arr[i] = 0.3 * np.random.normal(loc=1.0, scale=0.2)
+            arr[i] = 0.3 * np.random.normal(loc=1.0, scale=0.2) * arr_coef
     mu = {}
     for e in g.edges:
         mu[e] = np.random.uniform(0, 0.001)
-        mu[e] = 1e-8
-    a_dm = dm_instance(g, T, nu_bar, arr, s0, mu, r, w)
+    a_dm = dm_instance(g, T, nu_bar, arr, s0, mu, r, w, seed)
     return a_dm
 
 
 def generate_mm_instance(num_regions, num_skill_levels, len_horizon, seed=42):
+    # larger instances
     rg = np.random.RandomState(seed=seed)
     connection_quality = {}
     for i in range(num_regions):
@@ -107,9 +113,9 @@ def generate_mm_instance(num_regions, num_skill_levels, len_horizon, seed=42):
     for i in G:
         nu_bar[i] = 1 - np.exp(-10) 
         arr[i] = rg.randint(10)
-    arr_sum = sum(arr)
+    arr_sum = sum(arr.values())
     for i in G:
-        lam[i] = arr[i]/arr_sum*10
+        lam[i] = arr[i]/arr_sum*100
     mu = {}
     for e in G.edges:
         mu[e] = rg.uniform(0, 0.02)
@@ -118,40 +124,6 @@ def generate_mm_instance(num_regions, num_skill_levels, len_horizon, seed=42):
     for i in G:
         init_state[i] = rg.randint(5)
         w[i] = rg.uniform(0, 0.1)
-    dm = dm_instance(G, len_horizon, nu_bar, lam, init_state, mu, reward, w)
+    dm = dm_instance(G, len_horizon, nu_bar, lam, init_state, mu, reward, w, seed)
     return dm
 
-if __name__ == '__main__':
-    mm_pdf = pd.DataFrame()
-    for i in range(10):
-        mm_dm = generate_mm(100, seed=i)
-        mm_dm.generate_cycles(2)
-        print(mm_dm.mu_bar)
-        sim = simulator(mm_dm, 2)
-        sim.run(10)
-        sim.results['description'] = ['mm_base_'+str(i+1)]
-        sim.get_result_pdf()
-        print(sim.result_pdf)
-        mm_pdf = mm_pdf.append(sim.result_pdf,ignore_index=True)
-    
-
-    # for i in range(10):
-    #     mm_dm = generate_mm_instance(num_regions=5, num_skill_levels=5, len_horizon=100, seed=i)
-    #     sim = simulator(mm_dm, 2)
-    #     sim.run(10)
-    #     sim.results['description'] = ['mm_5_5_100_'+str(i+1)]
-    #     sim.get_result_pdf()
-    #     print(sim.result_pdf)
-    #     mm_pdf = mm_pdf.append(sim.result_pdf,ignore_index=True)
-
-    # for i in range(10):
-    #     mm_dm = generate_mm_instance(num_regions=10, num_skill_levels=10, len_horizon=100, seed=i)
-    #     sim = simulator(mm_dm, 2)
-    #     sim.run(10)
-    #     sim.results['description'] = ['mm_10_10_100_'+str(i+1)]
-    #     sim.get_result_pdf()
-    #     print(sim.result_pdf)
-    #     mm_pdf = mm_pdf.append(sim.result_pdf,ignore_index=True)
-
-    # mm_pdf.to_csv('results/mm.csv')  
-    # 

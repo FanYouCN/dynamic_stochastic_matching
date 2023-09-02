@@ -32,19 +32,17 @@ class dm_instance:
         self.lam = lam # vetex arrival rate, length |V| array
         self.s = s0
         self.rg = RandomState(seed)
-
+        self.seed = seed
+        self.description = ''
+        
     def generate_cycles(self, L):
         self.Cycles = []
         cycles = simple_cycles(self.Graph, L)
-        if L >= 3:
-            for c in cycles:
+        for c in cycles:
+            if len(c) == 1:
+                self.Cycles.append((c[0],c[0]))
+            else:
                 self.Cycles.append(tuple(c))
-        else:
-            for c in cycles:
-                if len(c) == 1:
-                    self.Cycles.append((c[0],c[0]))
-                else:
-                    self.Cycles.append(tuple(c))
         self.r_, self.mu_, self.mu_bar = {}, {}, {}
         self.Cycle_edges = {}
         for c in self.Cycles:
@@ -74,6 +72,7 @@ class dm_instance:
         for c in self.Cycles:
             for v in c:
                 self.cycles_containing_node_i[v].append(c)
+        # print(sum(self.mu_.values())/len(self.mu_.values()))
         if L == 2:
             self.L2G = nx.Graph() # build undirected graph for blossom cut generation
             for i in self.Nodes:
@@ -86,7 +85,6 @@ class dm_instance:
             Possion Arrival and Binomial Departure'''
         for i in self.Nodes:
             if self.s[i] < 0:
-                # print('~~~~~~~')
-                self.s[i] = 0
+                print('!!!!!!!!!!!!!!!!!!!!!!!!!!!')
             self.s[i] = self.rg.binomial(self.s[i], self.nu_bar[i])
             self.s[i] += self.rg.poisson(self.lam[i])
